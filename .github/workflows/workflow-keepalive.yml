@@ -1,8 +1,7 @@
 name: Workflow Keepalive
 on:
   schedule:
-    # UTC每周一早上5点执行检查
-    - cron: '0 5 * * 1'
+    - cron: '0 5 * * 1' # UTC每周一5点
   workflow_dispatch:
 
 jobs:
@@ -10,16 +9,26 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Keep workflow alive
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          use_api: false
-          days_before_disable: 45
-          commit_message: "chore: auto keepalive workflow"
-          committer_username: github-actions[bot]
-          committer_email: github-actions[bot]@users.noreply.github.com
+      - name: Check last commit age & keepalive
+        run: |
+          # 获取最近一次提交距今天数
+          LAST_COMMIT=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          DAYS=$(( (NOW - LAST_COMMIT) / 86400 ))
+          echo "Days since last commit: $DAYS"
+
+          if [ $DAYS -ge 45 ]; then
+            echo "Trigger keepalive commit"
+            echo "$(date)" > .keepalive.timestamp
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .keepalive.timestamp
+            git commit -m "chore: auto workflow keepalive"
+            git push
+          else
+            echo "No need keepalive yet"
+          fi
